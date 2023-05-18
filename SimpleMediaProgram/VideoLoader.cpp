@@ -36,14 +36,12 @@ bool VideoLoader::open(std::string path, size_t height, size_t width)
 	return true;
 }
 
-Frame& VideoLoader::read(bool& success, Frame& frame)
+bool VideoLoader::read( std::unique_ptr<Frame>& frame)
 {
 	this->fin.read((char*)(this->buf), this->stride);
 	if (this->fin.eof() && !this->fin.gcount())
-	{
-		success = false;
-		return frame;
-	}
+		return false;
+	
 	
 	auto y = this->buf;
 	auto cb = this->buf + this->size;
@@ -52,7 +50,7 @@ Frame& VideoLoader::read(bool& success, Frame& frame)
 	uint8_t r = 0, g = 0, b = 0;
 	size_t image_idx = 0;
 
-	auto _data = frame.getData();
+	auto _data = frame.get()->getData();
 	for (int i = 0; i < this->height; i++)
 	{
 		for (int j = 0; j < this->width; j++)
@@ -67,8 +65,8 @@ Frame& VideoLoader::read(bool& success, Frame& frame)
 			_data[image_idx++] = b;
 		}
 	}
-	success = true;
-	return frame;
+	
+	return true;
 }
 
 inline void VideoLoader::yuv420_to_rgb(uint8_t& r, uint8_t& g, uint8_t& b, uint8_t y, uint8_t cb, uint8_t cr)

@@ -1,27 +1,34 @@
-#include "VideoLoader.h"
-#include "VideoWriter.h"
-#include "config.h"
 
 #include <iostream>
 #include <fstream>
 
+#include <memory>
+#include <thread>
+#include <chrono>
+#include <queue>
 
-void down_sample(Frame& src, Frame& dst)
+#include "EventMessage.h"
+#include "VideoLoader.h"
+#include "VideoWriter.h"
+#include "config.h"
+
+
+void down_sample(std::unique_ptr<Frame>& src, std::unique_ptr<Frame>& dst)
 {
-	int sh = (int)(src.getHeight() / dst.getHeight());
-	int sw = (int)(src.getWidth() / dst.getWidth());
+	int sh = (int)(src.get()->getHeight() / dst.get()->getHeight());
+	int sw = (int)(src.get()->getWidth() / dst.get()->getWidth());
 
-	auto src_data = src.getData();
-	auto dst_data = dst.getData();
+	auto src_data = src.get()->getData();
+	auto dst_data = dst.get()->getData();
 
 	int idx = 0;
-	for (int i = 0; i < src.getHeight(); i += sh)
+	for (int i = 0; i < src.get()->getHeight(); i += sh)
 	{
-		for (int j = 0; j < src.getWidth(); j += sw)
+		for (int j = 0; j < src.get()->getWidth(); j += sw)
 		{
-			dst_data[idx++] = src_data[i * src.getWidth() * 3 + j * 3];
-			dst_data[idx++] = src_data[i * src.getWidth() * 3 + j * 3 + 1];
-			dst_data[idx++] = src_data[i * src.getWidth() * 3 + j * 3 + 2];
+			dst_data[idx++] = src_data[i * src.get()->getWidth() * 3 + j * 3];
+			dst_data[idx++] = src_data[i * src.get()->getWidth() * 3 + j * 3 + 1];
+			dst_data[idx++] = src_data[i * src.get()->getWidth() * 3 + j * 3 + 2];
 		}
 	}
 }
@@ -34,28 +41,93 @@ int main()
 		"C:\\Users\\jangsoopark\\Desktop\\asdf\\ta\\2023\\oop\\project\\RaceHorses_416x240_30\\RaceHorses_208x120_30.rgb",
 		240, 416, 3);
 
-	VideoLoader video_loader(config.input_path, config.height, config.width);
-	VideoWriter video_writer(config.output_path, (config.height >> 1), (config.width >> 1));
+	std::queue<std::unique_ptr<Frame> > input_video_queue;
+	std::queue<std::unique_ptr<Frame> > output_video_queue;
+	bool is_running = true;
 
-	Frame frame(config.height, config.width);
-	Frame resized(config.height >> 1, config.width >> 1);
+	std::thread video_read_thread([&input_video_queue, &is_running](std::string path, size_t height, size_t width) {
+		VideoLoader video_loader(path, height, width);
+		while (is_running)
+		{
+			std::unique_ptr<Frame> frame = std::make_unique<Frame>(height, width);
+			is_running = video_loader.read(frame);
+			if (!is_running)
+			{
+				break;
+			}
+			input_video_queue.push(std::move(frame));
+			std::cout << "read frame" << std::endl;
+		}}, config.input_path, config.height, config.width);
 
-	bool ret = false;
+	std::thread down_sample_x2_thread([&input_video_queue, &output_video_queue, &is_running]() {
+		while (is_running)
+		{
+			if (input_video_queue.empty())
+				continue;
+			std::unique_ptr<Frame> original_frame_ptr = std::move(input_video_queue.front());
+			input_video_queue.pop();
+			
+			std::unique_ptr<Frame> resized_frame_ptr = std::make_unique<Frame>(
+				original_frame_ptr.get()->getHeight() >> 1, original_frame_ptr.get()->getWidth() >> 1);
 
-	int i = 0;
-	while (true)
-	{
-		video_loader.read(ret, frame);
+			down_sample(original_frame_ptr, resized_frame_ptr);
+			output_video_queue.push(std::move(resized_frame_ptr));
+			std::cout << "down sample X2" << std::endl;
+		}
+		});
 
-		if (!ret)
-			break;
+	std::thread video_write_thread([&output_video_queue, &is_running](std::string path, size_t height, size_t width) {
+		VideoWriter video_writer(path, height, width);
+		while (is_running)
+		{
+			if (output_video_queue.empty())
+				continue;
+			auto _ptr = std::move(output_video_queue.front());
+			output_video_queue.pop();
 
-		down_sample(frame, resized);
-		video_writer.write(resized);
-		i++;
-	}
+			video_writer.write(_ptr);
 
-	std::cout << i << std::endl;
+		}
+		std::cout << "write frame" << std::endl;
+		}, config.output_path, config.height >> 1, config.width >> 1);
+
+	video_write_thread.join();
+	down_sample_x2_thread.join();
+	video_read_thread.join();
+		/*
+		while (true)
+		{
+			if(input_video_queue.empty())
+				continue;
+
+			auto _ptr = input_video_queue.front();
+			input_video_queue.pop();
+		
+			video_writer.write(frame);*/
+
+		//}}, config.output_path, (config.height >> 1), (config.width >> 1));
+	
+	//
+
+	//Frame frame(config.height, config.width);
+	//Frame resized(config.height >> 1, config.width >> 1);
+
+	//bool ret = false;
+
+	//int i = 0;/*
+	//while (true)
+	//{
+	//	video_loader.read(ret, frame);
+
+	//	if (!ret)
+	//		break;
+
+	//	down_sample(frame, resized);
+	//	video_writer.write(resized);
+	//	i++;
+	//}*/
+
+	//std::cout << i << std::endl;
 
 	return 0;
 }

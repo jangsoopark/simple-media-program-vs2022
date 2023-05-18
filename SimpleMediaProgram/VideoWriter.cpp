@@ -30,8 +30,9 @@ bool VideoWriter::open(std::string path, size_t height, size_t width)
 	return true;
 }
 
-void VideoWriter::write(Frame& frame)
+void VideoWriter::write(std::unique_ptr<Frame>& frame)
 {
-	this->fout.write((char*)(frame.getData()), this->stride);
+	auto data = frame.get();
+	this->fout.write((char*)(data->getData()), this->stride);
 }
 

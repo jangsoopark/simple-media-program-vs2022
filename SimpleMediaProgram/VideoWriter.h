@@ -14,7 +14,7 @@ public:
 	~VideoWriter();
 
 	bool open(std::string path, size_t height, size_t width);
-	void write(Frame& frmae);
+	void write(std::unique_ptr<Frame>& frame);
 
 private:
 	

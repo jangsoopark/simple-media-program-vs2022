@@ -15,7 +15,7 @@ public:
 	~VideoLoader();
 
 	bool open(std::string path, size_t height, size_t width);
-	Frame& read(bool& success, Frame& frmae);
+	bool read(std::unique_ptr<Frame>& frmae);
 	
 private:
 	inline void yuv420_to_rgb(uint8_t& r, uint8_t& g, uint8_t& b, uint8_t y, uint8_t cb, uint8_t cr);
@@ -30,6 +30,5 @@ private:
 	
 	std::ifstream fin;
 	uint8_t* buf;
-
 };
 
