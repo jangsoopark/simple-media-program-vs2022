@@ -22,7 +22,7 @@ public:
 
 private:
 	
-	uint8_t* data;	// TODO: It seems must be smart pointer
+	uint8_t* data;
 	size_t height;
 	size_t width;
 };

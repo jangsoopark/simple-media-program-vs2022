@@ -134,7 +134,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.h" />
-    <ClInclude Include="EventMessage.h" />
     <ClInclude Include="Frame.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="VideoLoader.h" />
